@@ -53,6 +53,12 @@ function lookup(string $line): array {
 }
 
 /** 1社の状態：[ラベル, 重さ（0=問題なし 1=確認 2=要注意）, 説明] */
+/** 確認が要る取引先を上に：要注意 → 未登録 → 登録あり → 見つからない。同じ順位の中は入力の順のまま */
+function sortRows(array $rows): array {
+    usort($rows, fn($a, $b) => [$a[0], $a[1]] <=> [$b[0], $b[1]]);
+    return $rows;
+}
+
 function status(array $c): array {
     if ($c['close_date']) return ['登記が閉鎖', 2, jd($c['close_date']) . '・' . $c['close_cause']];
     if ($c['inv_disposal']) return ['インボイス取消', 2, jd($c['inv_disposal']) . 'に取消'];
@@ -144,12 +150,13 @@ $body .= '<form method="post" class="panel" action="' . u('/') . '"><label for="
 if ($res) {
     $rows = []; $cnt = [0, 0, 0]; $none = 0; $multi = 0;
     foreach ($res as $r) {
-        if (!$r['cs']) { $none++; $rows[] = [3, '<tr><td>' . h($r['in']) . '</td><td colspan="4"><span class="tag tx">見つからない</span> 愛知県の法人に該当なし（県外の本店・個人事業者・名称の違いなど）</td></tr>']; continue; }
+        if (!$r['cs']) { $none++; $rows[] = [3, count($rows), '<tr><td>' . h($r['in']) . '</td><td colspan="4"><span class="tag tx">見つからない</span> 愛知県の法人に該当なし（県外の本店・個人事業者・名称の違いなど）</td></tr>']; continue; }
         if (count($r['cs']) > 1) $multi++;
+        $g = count($rows); $rank = 2 - status($r['cs'][0])[1];   // 1社ぶん（同名の候補を含む）を1かたまりで並べ替える
         foreach ($r['cs'] as $k => $c) {
             [$lab, $w, $note] = status($c);
             if ($k === 0) $cnt[$w]++;
-            $rows[] = [$k === 0 ? (2 - $w) : 9, '<tr><td>' . ($k === 0 ? h($r['in']) . '<br><span class="src">' . h($r['how']) . (count($r['cs']) > 1 ? '・候補' . count($r['cs']) . '件' : '') . '</span>' : '<span class="src">　同名の候補</span>') . '</td>'
+            $rows[] = [$rank, $g, '<tr><td>' . ($k === 0 ? h($r['in']) . '<br><span class="src">' . h($r['how']) . (count($r['cs']) > 1 ? '・候補' . count($r['cs']) . '件' : '') . '</span>' : '<span class="src">　同名の候補</span>') . '</td>'
                 . '<td><b>' . h($c['name']) . '</b><br><span class="src">' . h($c['no']) . '・' . h($c['kind']) . '</span></td>'
                 . '<td>' . h($c['city'] . $c['street']) . '</td>'
                 . '<td><span class="tag t' . $w . '">' . h($lab) . '</span><br><span class="src">' . h($note) . '</span></td>'
@@ -157,7 +164,7 @@ if ($res) {
         }
     }
     $body .= '<h2>結果（' . count($res) . '社）</h2><div class="big"><div><span class="k">要注意（閉鎖・取消・失効）</span><span class="v' . ($cnt[2] ? ' ng' : '') . '">' . $cnt[2] . '社</span></div><div><span class="k">インボイス未登録</span><span class="v' . ($cnt[1] ? ' wa' : '') . '">' . $cnt[1] . '社</span></div><div><span class="k">登録あり</span><span class="v">' . $cnt[0] . '社</span></div><div><span class="k">見つからない／同名が複数</span><span class="v">' . $none . '／' . $multi . '</span></div></div>';
-    $body .= '<div class="tbl"><table><tr><th>入力</th><th>法人</th><th>所在地</th><th>状態</th><th>インボイス登録番号</th></tr>' . implode('', array_map(fn($x) => $x[1], $rows)) . '</table></div>';
+    $body .= '<div class="tbl"><table><tr><th>入力</th><th>法人</th><th>所在地</th><th>状態</th><th>インボイス登録番号</th></tr>' . implode('', array_map(fn($x) => $x[2], sortRows($rows))) . '</table></div>';
     $body .= '<p class="src">状態は国税庁の全件データ（' . h(jd(meta('houjin_asof'))) . '時点）によります。取引の前には国税庁の公表サイトで最新の状態を確認してください。</p>';
 }
 [$fh, $fl] = [
