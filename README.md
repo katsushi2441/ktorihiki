@@ -4,6 +4,20 @@
 
 公開: https://kurage.exbridge.jp/ktorihiki.php/ （愛知県に本店のある法人）
 
+## 置き方
+
+1. PHP 8.1 以上と SQLite（pdo_sqlite）が使えるレンタルサーバーに `php/` の中身を置く。`ktorihiki_data/` の `.htaccess` でデータは外から読めない（Apache の場合）。`SITE` / `BASE` 定数を自分の URL に変える。
+2. データを組む手元のサーバー（Python 3.10 以上・標準ライブラリだけ）に `scripts/` を置き、リポジトリ直下に `.env` を作る：
+
+```
+FTP_HOST=ftp.example.com
+FTP_USER=...
+FTP_PASS=...
+REMOTE_DIR=/web/example_com/ktorihiki_data
+```
+
+3. cron で1日1回 `python3 scripts/update.py` を回す（新しいデータがあるときだけ組み直して FTPS で置く）。
+
 ## 構成
 
 - `scripts/fetch.py` … 国税庁の全件データを取る（法人番号＝都道府県の CSV・Unicode、インボイス＝法人分の CSV 全部）
