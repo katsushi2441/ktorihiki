@@ -1,0 +1,4 @@
+data/
+outputs/
+php/ktorihiki_data/*.sqlite*
+__pycache__/
